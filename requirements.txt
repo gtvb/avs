@@ -1,0 +1,4 @@
+TTS
+stable-ts
+deep-translator
+numpy

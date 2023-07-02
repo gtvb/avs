@@ -27,7 +27,6 @@ def parse_srt(path):
             insert_silence = False
             # subtract next's start timestamp in ms from current's end timestamp also in ms
             delta = to_milliseconds(next_timestamp[0]) - to_milliseconds(current_timestamp[1])
-            print("Delta is ", delta, " MS")
             if delta >= 1500:
                 insert_silence = True
 
@@ -71,7 +70,3 @@ def to_milliseconds(timestamp_dict):
     }
 
     return sum(value * conversion_factors.get(key, 0) for key, value in timestamp_dict.items())
-
-
-# if __name__ == "__main__":
-#     parse_srt("./resources/transcriptions/yeast.srt")
