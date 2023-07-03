@@ -14,10 +14,10 @@ COPY ["requirements.txt", "/app/"]
 
 RUN pip install -r requirements.txt
 
-RUN --mount=type=cache,target=/var/cache/apt \
-  apt update && apt-get install -y --no-install-recommends ffmpeg espeak-ng
-
 FROM python:3.10-slim-bookworm as final
+
+RUN apt-get -y update
+RUN apt-get install ffmpeg espeak-ng -y
 
 RUN useradd -m avs_user
 USER avs_user

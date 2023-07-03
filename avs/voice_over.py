@@ -6,10 +6,15 @@ from srt_parser import parse_srt, to_milliseconds
 from TTS.api import TTS
 
 def generate_voice_over(transcription_path):
-    transcriptions = parse_srt(transcription_path)
-    wav_array = generate_wavs(transcriptions)
+    # transcriptions = parse_srt(transcription_path)
+    # wav_array = generate_wavs(transcriptions)
 
-    save_wav("output.wav", wav_array, 16000)
+    # save_wav("output.wav", wav_array, 16000)
+    model_name = TTS.list_models()[0]
+    tts = TTS(model_name)
+    # decreasing the length_scale fastens speech, great!
+    # tts.synthesizer.tts_model.length_scale = 0.3
+    tts.tts_to_file("This is a test! This is also a test! Testing velocity", speaker=tts.speakers[0], language=tts.languages[0])
 
 def save_wav(filename, wav_array, sample_rate):
     with wave.open(filename, "w") as f:
