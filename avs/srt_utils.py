@@ -11,6 +11,7 @@ def parse_srt(path):
             current = contents[i].split("\n")
             current_timestamp = process_timestamp_str(current[1])
 
+
             if i == len(contents) - 1:
                 transcriptions.append({
                     "start": current_timestamp[0],
@@ -23,11 +24,10 @@ def parse_srt(path):
             next = contents[i + 1].split("\n")
             next_timestamp = process_timestamp_str(next[1])
 
-
             insert_silence = False
             # subtract next's start timestamp in ms from current's end timestamp also in ms
             delta = to_milliseconds(next_timestamp[0]) - to_milliseconds(current_timestamp[1])
-            if delta >= 1500:
+            if delta > 0:
                 insert_silence = True
 
             transcriptions.append({
@@ -45,6 +45,7 @@ def parse_srt(path):
                 })
 
     return transcriptions
+
 
 def process_timestamp_str(timestamp_str):
     parts = timestamp_str.split(" --> ")

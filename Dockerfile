@@ -14,10 +14,11 @@ COPY ["requirements.txt", "/app/"]
 
 RUN pip install -r requirements.txt
 
+# Final Image
 FROM python:3.10-slim-bookworm as final
 
 RUN apt-get -y update
-RUN apt-get install ffmpeg espeak-ng -y
+RUN apt-get install ffmpeg espeak-ng rubberband-cli -y
 
 RUN useradd -m avs_user
 USER avs_user

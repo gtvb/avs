@@ -1,50 +1,48 @@
-import numpy as np
-import wave
-import struct
+import tempfile
+import subprocess
+import soundfile as sf
 
-from srt_parser import parse_srt, to_milliseconds
+import numpy as np
+from srt_utils import parse_srt, to_milliseconds
 from TTS.api import TTS
 
-def generate_voice_over(transcription_path):
-    # transcriptions = parse_srt(transcription_path)
-    # wav_array = generate_wavs(transcriptions)
+def generate_voice_over(transcription_path, out_path):
+    transcriptions = parse_srt(transcription_path)
+    wav_array = generate_wavs(transcriptions)
 
-    # save_wav("output.wav", wav_array, 16000)
-    model_name = TTS.list_models()[0]
-    tts = TTS(model_name)
-    # decreasing the length_scale fastens speech, great!
-    # tts.synthesizer.tts_model.length_scale = 0.3
-    tts.tts_to_file("This is a test! This is also a test! Testing velocity", speaker=tts.speakers[0], language=tts.languages[0])
+    sf.write(out_path, wav_array, 16000)
 
-def save_wav(filename, wav_array, sample_rate):
-    with wave.open(filename, "w") as f:
-        f.setnchannels(1)
-        f.setsampwidth(2)
-        f.setframerate(sample_rate)
-
-        for sample in wav_array:
-            sample = int(sample * (2 ** 15 - 1))
-            f.writeframes(struct.pack("<h", sample))
-
-# This function grabs a dictionary with the silences already
-# inserted and generates all the wavs for those segments.
 def generate_wavs(transcriptions):
     wav_array = []
 
     tts_model_config = prompt_tts_configs()
     model = tts_model_config["model"]
 
-    print("Generating speech from chunks...")
     for chunk in transcriptions:
+        optimal_duration = to_milliseconds(chunk["end"]) - to_milliseconds(chunk["start"])
+
         if chunk["is_silence"]:
-            silence_duration = to_milliseconds(chunk["end"]) - to_milliseconds(chunk["start"])
-            wav_array.extend(generate_silence(silence_duration, 16000))
+            print(f"SILENCE, Generating and extending wav array...")
+            silence = generate_silence(optimal_duration / 1000, 16000)
+            wav_array.extend(silence)
             continue
 
-        print("Generating speech for chunk ", chunk["text"])
-        wav = model.tts(chunk["text"], speaker=tts_model_config["speaker"], language=tts_model_config["language"])
-        wav_array.extend(wav)
+        tmp_generated_chunk = tempfile.NamedTemporaryFile()
+        model.tts_to_file(chunk["text"], speaker=tts_model_config["speaker"], language=tts_model_config["language"], file_path=tmp_generated_chunk.name)
+
+        out_info = sf.info(tmp_generated_chunk.name)
+        generated_wav_duration = (out_info.frames / out_info.samplerate) * 1000
+
+        tmp_adjusted_chunk = tempfile.NamedTemporaryFile()
+        subprocess.run(["rubberband", "-3", tmp_generated_chunk.name, tmp_adjusted_chunk.name, "--time", str(optimal_duration / generated_wav_duration)])
+
+        data, samplerate = sf.read(tmp_adjusted_chunk.name)
+        ad_info = sf.info(tmp_adjusted_chunk.name)
+        ad_dur = (ad_info.frames / ad_info.samplerate) * 1000
         
+        print(f"OPTIMAL: {optimal_duration}ms, REAL: {ad_dur}ms")
+        wav_array.extend(data)
+
     return wav_array
 
 def prompt_tts_configs():
@@ -79,14 +77,10 @@ def prompt_tts_configs():
             "language": language
     }
 
-
-def generate_silence(duration_ms, sampling_frequency):
+def generate_silence(duration, samplerate):
     silent_wav = []
-    total_samples = int((duration_ms / 1000) * sampling_frequency)
+    total_samples = int(duration * samplerate)
     for _ in range(0, total_samples):
         silent_wav.append(0)
 
     return silent_wav
-
-if __name__ == "__main__":
-    generate_voice_over("./resources/transcriptions/yeast.srt")    

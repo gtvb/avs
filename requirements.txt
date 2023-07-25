@@ -1,4 +1,6 @@
 TTS
 stable-ts
 deep-translator
+soundfile
 numpy
+ffmpeg-python

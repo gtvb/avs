@@ -25,7 +25,7 @@ docker build \
   --tag "${IMAGE}:latest" \
   --build-arg BUILDKIT_INLINE_CACHE=1 \
   "${CONTEXT_DIR}"
-  
+
 # # Push the final image
 # docker tag "${IMAGE}:latest" "${IMAGE}:${FINAL_TAG}"
 # docker push "${IMAGE}:${FINAL_TAG}"
