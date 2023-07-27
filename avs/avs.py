@@ -5,21 +5,45 @@ import tempfile
 
 from whisper.tokenizer import get_tokenizer
 from voice_over import generate_voice_over
+from translation import obtain_translated_transcription
+from srt_utils import parse_srt
 
 def main():
     parser = argparse.ArgumentParser(prog="avs", description="Generate a transcribed video using the language of your choice!")
     parser.add_argument("video_filename")
+    parser.add_argument("--translate", action="store_true")
+    parser.add_argument("--with_transcription")
     args = parser.parse_args()
 
-    tmp_transcription = tempfile.NamedTemporaryFile(suffix=".srt")
-    generate_transcription(tmp_transcription.name, args.video_filename)
+    if not args.with_transcription: 
+        print("Generating transcriptions for video...")
+        tmp_transcription = tempfile.NamedTemporaryFile(suffix=".srt")
+        generate_transcription(tmp_transcription.name, args.video_filename)
+
+        transcriptions_path = tmp_transcription.name
+    else:
+        print("Transcriptions path already provided, skipping generation...")
+        transcriptions_path = args.with_transcription
+
+    if args.translate:
+        tmp_transcriptions_handle = obtain_translated_transcription(transcriptions_path, "pt")
+        transcriptions_path = tmp_transcriptions_handle.name
+    else:
+        print("Skipping translation process, moving on to speech generation...")
+
+    transcriptions = parse_srt(transcriptions_path)
 
     tmp_generated_audio = tempfile.NamedTemporaryFile(suffix=".wav")
-    generate_voice_over(tmp_transcription.name, tmp_generated_audio.name)
+    generate_voice_over(transcriptions, tmp_generated_audio.name)
 
+    # These are the three ffmpeg input sources that will be used on the merge and 
+    # output operations. We merge the original audio with the generated one, and merge 
+    # them. After that we need to select the original video's video stream, the merged 
+    # audio and the transcriptions path, that can be translated or not (in the last case, 
+    # the application would act like a dynamic reader).
     original_video_input = ffmpeg.input(args.video_filename)
     generated_audio_input = ffmpeg.input(tmp_generated_audio.name)
-    transcription_input = ffmpeg.input(tmp_transcription.name)
+    transcription_input = ffmpeg.input(transcriptions_path)
 
     lowered_audio = original_video_input.audio.filter("volume", "0.1")
 
@@ -28,6 +52,9 @@ def main():
 
     ffmpeg.run(output)
 
+    if args.translate:
+        tmp_transcriptions_handle.close()
+    tmp_generated_audio.close()
 
 def generate_transcription(transcription_out, audio_stream):
     tokenizer = get_tokenizer(multilingual=True)

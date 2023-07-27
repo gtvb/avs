@@ -6,10 +6,8 @@ import numpy as np
 from srt_utils import parse_srt, to_milliseconds
 from TTS.api import TTS
 
-def generate_voice_over(transcription_path, out_path):
-    transcriptions = parse_srt(transcription_path)
+def generate_voice_over(transcriptions, out_path):
     wav_array = generate_wavs(transcriptions)
-
     sf.write(out_path, wav_array, 16000)
 
 def generate_wavs(transcriptions):
@@ -18,6 +16,7 @@ def generate_wavs(transcriptions):
     tts_model_config = prompt_tts_configs()
     model = tts_model_config["model"]
 
+    tmp_generated_chunk = tmp_adjusted_chunk = None
     for chunk in transcriptions:
         optimal_duration = to_milliseconds(chunk["end"]) - to_milliseconds(chunk["start"])
 
@@ -36,12 +35,16 @@ def generate_wavs(transcriptions):
         tmp_adjusted_chunk = tempfile.NamedTemporaryFile()
         subprocess.run(["rubberband", "-3", tmp_generated_chunk.name, tmp_adjusted_chunk.name, "--time", str(optimal_duration / generated_wav_duration)])
 
-        data, samplerate = sf.read(tmp_adjusted_chunk.name)
+        data, _ = sf.read(tmp_adjusted_chunk.name)
         ad_info = sf.info(tmp_adjusted_chunk.name)
         ad_dur = (ad_info.frames / ad_info.samplerate) * 1000
         
         print(f"OPTIMAL: {optimal_duration}ms, REAL: {ad_dur}ms")
         wav_array.extend(data)
+
+    if tmp_adjusted_chunk is not None and tmp_generated_chunk is not None:
+        tmp_generated_chunk.close()
+        tmp_adjusted_chunk.close()
 
     return wav_array
 

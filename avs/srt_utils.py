@@ -1,51 +1,45 @@
+# It's important to notice that this parser does not work for word level timestemps,
+# nor can it recognize html tags on them. It works fine for the simplest .srt format
+# with the counter, timestamp header and text value.
 def parse_srt(path):
     transcriptions = []
     with open(path, "r") as reader:
         contents = reader.read().split("\n\n")
 
         for i in range(0, len(contents)):
-            # those are the raw timestamp pieces. Index 0
-            # represents id (unused), index 1 represents the 
+            # Those are the raw timestamp pieces. Index 0
+            # represents id, index 1 represents the 
             # timestamp, which is processed using the process_timestamp_str func
-            # last index represents the content itself
+            # last index(2) represents the content itself
             current = contents[i].split("\n")
+            print(current)
             current_timestamp = process_timestamp_str(current[1])
-
-
-            if i == len(contents) - 1:
-                transcriptions.append({
+            current_transcription_dict = {
                     "start": current_timestamp[0],
                     "end": current_timestamp[1],
                     "text": current[2],
                     "is_silence": False
-                })
-                break
+            }
+            transcriptions.append(current_transcription_dict)
 
-            next = contents[i + 1].split("\n")
-            next_timestamp = process_timestamp_str(next[1])
+            if i + 1 < len(contents):
+                next = contents[i + 1].split("\n")
+                print(next)
+                next_timestamp = process_timestamp_str(next[1])
 
-            insert_silence = False
-            # subtract next's start timestamp in ms from current's end timestamp also in ms
-            delta = to_milliseconds(next_timestamp[0]) - to_milliseconds(current_timestamp[1])
-            if delta > 0:
-                insert_silence = True
+                # Figure out if a silence needs to be insertd before the next item
+                delta = to_milliseconds(next_timestamp[0]) - to_milliseconds(current_timestamp[1])
+                if delta > 0:
+                    transcriptions.append({
+                        "start": current_timestamp[1],
+                        "end": next_timestamp[0],
+                        "is_silence": True
+                    })
 
-            transcriptions.append({
-                "start": current_timestamp[0],
-                "end": current_timestamp[1],
-                "text": current[2],
-                "is_silence": False
-            })
-            
-            if insert_silence:
-                transcriptions.append({
-                    "start": current_timestamp[1],
-                    "end": next_timestamp[0],
-                    "is_silence": True
-                })
+    for i in range(0, len(transcriptions)):
+        transcriptions[i]["id"] = i
 
     return transcriptions
-
 
 def process_timestamp_str(timestamp_str):
     parts = timestamp_str.split(" --> ")
@@ -71,3 +65,6 @@ def to_milliseconds(timestamp_dict):
     }
 
     return sum(value * conversion_factors.get(key, 0) for key, value in timestamp_dict.items())
+
+if __name__ == "__main__":
+    parse_srt("./resources/transcriptions/gpt-llama.srt") 
