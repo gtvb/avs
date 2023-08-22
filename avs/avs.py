@@ -13,6 +13,7 @@ def main():
     parser.add_argument("video_filename")
     parser.add_argument("--translate", action="store_true")
     parser.add_argument("--with_transcription")
+    parser.add_argument("--save_srt")
     args = parser.parse_args()
 
     if not args.with_transcription: 
@@ -25,14 +26,25 @@ def main():
         print("Transcriptions path already provided, skipping generation...")
         transcriptions_path = args.with_transcription
 
+    tmp_transcriptions_handle = None
     if args.translate:
         tmp_transcriptions_handle = obtain_translated_transcription(transcriptions_path, "pt")
         transcriptions_path = tmp_transcriptions_handle.name
     else:
         print("Skipping translation process, moving on to speech generation...")
 
+    if args.save_srt:
+        print(f"SAVING GENERATED TRANSCRIPTION TO PATH {transcriptions_path}")
+
+        with open(transcriptions_path, 'r') as input_file:
+            contents = input_file.read()
+
+        with open(args.save_srt, 'w') as output_file:
+            output_file.write(contents)
+
     transcriptions = parse_srt(transcriptions_path)
 
+    # from voice_over import generate_voice_over
     tmp_generated_audio = tempfile.NamedTemporaryFile(suffix=".wav")
     generate_voice_over(transcriptions, tmp_generated_audio.name)
 
@@ -45,18 +57,20 @@ def main():
     generated_audio_input = ffmpeg.input(tmp_generated_audio.name)
     transcription_input = ffmpeg.input(transcriptions_path)
 
-    lowered_audio = original_video_input.audio.filter("volume", "0.1")
+    lowered_audio = original_video_input.audio.filter("volume", "0.075")
 
     merged_audio = ffmpeg.filter([lowered_audio, generated_audio_input], "amerge")
     output = ffmpeg.output(original_video_input.video, merged_audio, transcription_input, "avs.mp4", vcodec="copy", acodec="aac", **{"c:s": "mov_text"})
 
     ffmpeg.run(output)
 
-    if args.translate:
+    if tmp_transcriptions_handle is not None:
         tmp_transcriptions_handle.close()
     tmp_generated_audio.close()
 
 def generate_transcription(transcription_out, audio_stream):
+    min_length = .65
+
     tokenizer = get_tokenizer(multilingual=True)
     number_tokens = [
         i for i in range(tokenizer.eot) if all(c in "0123456789" for c in tokenizer.decode([i]).removeprefix(" "))
@@ -68,7 +82,7 @@ def generate_transcription(transcription_out, audio_stream):
         result
         .split_by_punctuation([('.', ' '), '。', '?', '？', ',', '，'])
         .split_by_gap(.5)
-        .merge_by_gap(.35, max_words=8)
+        .merge_by_gap(min_length, max_words=8)
         .split_by_punctuation([('.', ' '), '。', '?', '？'])
     )
 

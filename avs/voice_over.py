@@ -36,10 +36,7 @@ def generate_wavs(transcriptions):
         subprocess.run(["rubberband", "-3", tmp_generated_chunk.name, tmp_adjusted_chunk.name, "--time", str(optimal_duration / generated_wav_duration)])
 
         data, _ = sf.read(tmp_adjusted_chunk.name)
-        ad_info = sf.info(tmp_adjusted_chunk.name)
-        ad_dur = (ad_info.frames / ad_info.samplerate) * 1000
-        
-        print(f"OPTIMAL: {optimal_duration}ms, REAL: {ad_dur}ms")
+
         wav_array.extend(data)
 
     if tmp_adjusted_chunk is not None and tmp_generated_chunk is not None:
@@ -49,7 +46,8 @@ def generate_wavs(transcriptions):
     return wav_array
 
 def prompt_tts_configs():
-    models = TTS.list_models()
+    tts_instance = TTS()
+    models = tts_instance.list_models()
     for i in range(0, len(models)):
         print(f"{i+1}) {models[i]}")
 
